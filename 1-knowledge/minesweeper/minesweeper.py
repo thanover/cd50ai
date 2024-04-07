@@ -108,14 +108,14 @@ class Sentence():
     def known_safes(self):
         if self.count == 0:
             return self.cells
-        
 
     def mark_mine(self, cell):
         """
         Updates internal knowledge representation given the fact that
         a cell is known to be a mine.
         """
-        self.cells = list(filter(lambda x: x == cell, self.cells))
+
+        self.cells.difference_update({cell})
         self.count -= self.count
 
     def mark_safe(self, cell):
@@ -123,7 +123,7 @@ class Sentence():
         Updates internal knowledge representation given the fact that
         a cell is known to be safe.
         """
-        self.cells = list(filter(lambda x: x == cell, self.cells))
+        self.cells.difference_update({cell})
 
 
 class MinesweeperAI():
@@ -132,7 +132,7 @@ class MinesweeperAI():
     """
 
     def __init__(self, height=8, width=8):
-        
+
         # Set initial height and width
         self.height = height
         self.width = width
@@ -180,34 +180,45 @@ class MinesweeperAI():
             5) add any new sentences to the AI's knowledge base
                if they can be inferred from existing knowledge
         """
+        print(f"-------MOVE MADE--- cell{cell} --- count: {count}")
+
         def get_neighboring_cells(cell):
             x = cell[0]
             y = cell[1]
             possible_neighbors = [
-                (x-1,y-1), (x, y-1), (x+1, y-1), (x-1, y), 
+                (x-1, y-1), (x, y-1), (x+1, y-1), (x-1, y),
                 (x+1, y), (x-1, y+1), (x, y+1), (x+1, y+1)]
-            
+
             def valid_cell(cell):
                 if cell[0] < 0 or cell[0] > self.width - 1:
-                     return False
+                    return False
                 if cell[1] < 0 or cell[1] > self.height - 1:
-                     return False
+                    return False
+                if cell in self.moves_made:
+                    return False
                 return True
 
             return list(filter(valid_cell, possible_neighbors))
 
         self.moves_made.add(cell)
         self.mark_safe(cell)
+
+        neighboring_cells = get_neighboring_cells(cell)
+        if count == 0:
+            for cell in neighboring_cells:
+                self.mark_safe(cell)
+        elif count == len(neighboring_cells):
+            for cell in neighboring_cells:
+                self.mark_mine(cell)
+        else:
+            self.knowledge.append(Sentence(neighboring_cells.copy(), count))
+
         print(f"moves made: {self.moves_made}")
         print(f"safes: {self.safes}")
-        print(f"cell[0]: {cell[0]}")
-        print(f"cell[1]: {cell[1]}")
-        neighboring_cells = get_neighboring_cells(cell)
-        self.knowledge.append(Sentence(neighboring_cells, count))
 
         print('The knowledge is:')
         for s in self.knowledge:
-            print(s)
+            print(f"s: {s}")
 
     def make_safe_move(self):
         """
@@ -218,7 +229,10 @@ class MinesweeperAI():
         This function may use the knowledge in self.mines, self.safes
         and self.moves_made, but should not modify any of those values.
         """
-        raise NotImplementedError
+        avail_moves = self.safes.difference(self.moves_made)
+        if len(avail_moves) > 0:
+            return avail_moves.pop()
+        return None
 
     def make_random_move(self):
         """
@@ -227,4 +241,13 @@ class MinesweeperAI():
             1) have not already been chosen, and
             2) are not known to be mines
         """
-        raise NotImplementedError
+        print('making random move')
+        all_moves_avail = set()
+        for i in range(self.width):
+            for j in range(self.height):
+                all_moves_avail.add((i, j))
+        all_moves_avail.difference_update(self.moves_made.union(self.mines))
+        if len(all_moves_avail) > 0:
+            return all_moves_avail.pop()
+
+        return None
