@@ -103,20 +103,24 @@ class Sentence():
 
     def known_mines(self):
         if len(self.cells) == self.count:
-            return self.cells
+            return self.cells.copy()
+
+        return set()
 
     def known_safes(self):
         if self.count == 0:
-            return self.cells
+            return self.cells.copy()
+
+        return set()
 
     def mark_mine(self, cell):
         """
         Updates internal knowledge representation given the fact that
         a cell is known to be a mine.
         """
-
-        self.cells.difference_update({cell})
-        self.count -= self.count
+        if cell in self.cells:
+            self.cells.difference_update({cell})
+            self.count = self.count - 1
 
     def mark_safe(self, cell):
         """
@@ -190,11 +194,9 @@ class MinesweeperAI():
                 (x+1, y), (x-1, y+1), (x, y+1), (x+1, y+1)]
 
             def valid_cell(cell):
-                if cell[0] < 0 or cell[0] > self.width - 1:
+                if cell[0] < 0 or cell[0] > self.height - 1:
                     return False
-                if cell[1] < 0 or cell[1] > self.height - 1:
-                    return False
-                if cell in self.moves_made:
+                if cell[1] < 0 or cell[1] > self.width - 1:
                     return False
                 return True
 
@@ -204,17 +206,54 @@ class MinesweeperAI():
         self.mark_safe(cell)
 
         neighboring_cells = get_neighboring_cells(cell)
-        if count == 0:
-            for cell in neighboring_cells:
-                self.mark_safe(cell)
-        elif count == len(neighboring_cells):
-            for cell in neighboring_cells:
-                self.mark_mine(cell)
-        else:
-            self.knowledge.append(Sentence(neighboring_cells.copy(), count))
+
+        for cell in self.mines:
+            if cell in neighboring_cells:
+                neighboring_cells.remove(cell)
+                count -= 1
+
+        for cell in self.safes:
+            if cell in neighboring_cells:
+                neighboring_cells.remove(cell)
+
+        self.knowledge.append(Sentence(neighboring_cells.copy(), count))
+
+        def check_mines_or_safe():
+            for i, sentence in enumerate(self.knowledge):
+                if sentence.known_mines():
+                    mines = sentence.known_mines()
+                    print(
+                        f"******removing {sentence} because it's all mines*****")
+                    for cell in mines:
+                        self.mark_mine(cell)
+                    self.knowledge.pop(i)
+                    continue
+                if sentence.known_safes():
+                    print(
+                        f"******removing {sentence} because it's all safes*****")
+                    safes = sentence.known_safes()
+                    for cell in safes:
+                        self.mark_safe(cell)
+                    self.knowledge.pop(i)
+                    continue
+
+        def check_for_subsets():
+            for i, sentence in enumerate(self.knowledge):
+                for j, other_sentence in enumerate(self.knowledge):
+                    if other_sentence.cells < sentence.cells:
+                        print(f"**SUBSET: {other_sentence} of {sentence}")
+                        sentence.cells.difference_update(other_sentence.cells)
+                        sentence.count = sentence.count - other_sentence.count
+                        # sentence.count = sentence.count - other_sentence.count
+                        # self.knowledge.pop(j)
+
+        check_mines_or_safe()
+        check_for_subsets()
+        check_mines_or_safe()
 
         print(f"moves made: {self.moves_made}")
         print(f"safes: {self.safes}")
+        print(f"mines: {self.mines}")
 
         print('The knowledge is:')
         for s in self.knowledge:
@@ -231,7 +270,9 @@ class MinesweeperAI():
         """
         avail_moves = self.safes.difference(self.moves_made)
         if len(avail_moves) > 0:
-            return avail_moves.pop()
+            move = avail_moves.pop()
+            print(f"Making safe move: {move}")
+            return move
         return None
 
     def make_random_move(self):
